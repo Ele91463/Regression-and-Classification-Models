@@ -1,0 +1,221 @@
+---
+title: Homework.2
+date: 03/05/2024
+author: Eleonora Giuliani 247161
+format:
+  pdf:
+   latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE,
+message=FALSE,
+tidy.opts=list(width.cutoff = 80),
+tidy = TRUE)
+```
+**Introduction**
+
+Prostate cancer is one of the most prevalent cancers among men. In this study, it is investigated the association between the level of prostate-specific antigen (PSA) and various clinical measures in a cohort of 97 men who were about to receive a radical prostatectomy. In particular, the explanatory variables are:
+ `lcavol`: log(cancer volume in cm3), `lweight`: log(prostate weight in g), `age` in years,lbph`: log(amount of benign prostatic hyperplasia in cm2), `svi`: seminal vesicle invasion (1 = yes, 0 = no),`lcp`: log(capsular penetration in cm),`gleason`: Gleason score for prostate cancer (6,7,8,9),`pgg45`: percentage of Gleason scores 4 or 5, recorded over their visit history before their final current Gleason score.
+
+```{r}
+#| echo: false
+
+df0 <- read.csv("C:/Users/eleon/Desktop/prostate.csv")
+#View(df0)
+#summary(df0)
+
+# ...
+```
+
+As previously mentioned, the variables included in the dataset are 9 and they are all numerical variables, specifically: lcavol, lweight, age, lbph, svi, lcp, gleason, pgg45 and lpsa. Before properly starting the analysis, we shall briefly examine the present dataset, beginning verifying the correctness of the opening.
+
+```{r}
+head(df0)
+```
+It is also important to verify the presence of NA values. In this case they are not present.
+```{r}
+#| echo: false
+library(tidyverse)
+# ...
+```
+
+```{r}
+#| echo: false
+#x <- as_tibble(data) %>% 
+#  mutate(High = cut(lpsa, c(-Inf, 8, Inf), c("No", "Yes"))) %>% 
+#  select(-lpsa)
+# c(-Inf, 8, Inf) is a vector of cut points (length: L);
+# c("No", "Yes") is a vector of category labels (length: L-1)
+# ...
+```
+
+```{r}
+#| echo: false
+#set.seed(2)
+#train.data <- sample(1:nrow(df), nrow(df)/2)
+#data.test <- data[-train.data, ]
+#lpsa.test <- data.test$lpsa
+
+#data <- as.data.frame(data)
+# ...
+```
+The next step is to fit the data into a decision tree model using the "tree" package in R, with 'lpsa' as the response variable and other variables as predictors. The analysis reveals that the variables were used to construct the tree are only three: 'lcavol', 'lweight' and 'pgg45'. Additionally, the tree comprises 9 terminal nodes, and that the residual mean deviance of 0.4119 indicates a reasonable fit of the model to the data.
+
+```{r}
+library(tree)
+set.seed(1)
+tree.data <- tree(lpsa ~ ., data=df0)
+summary(tree.data)
+```
+Following there is the plot of the model.
+```{r}
+#| echo: false
+plot(tree.data)
+text(tree.data, pretty=0)
+title(main="Regression tree")
+# ...
+```
+To select the optimal tree complexity, it is necessary to perform cross-validation. Indeed, by analyzing cross-validated error rates for different tree sizes, it is possible to decide whether to prune the tree.
+```{r}
+set.seed(1)
+cv.data <- cv.tree(object=tree.data)
+names(cv.data)  
+cv.data
+plot(cv.data$size, cv.data$dev, type='b')
+```
+To determine the optimal tree complexity, it is typically necessary to look for the tree size corresponding to the lowest cross-validated error. In this specific case, the lowest cross-validated error(80.87758) is associated with a tree having 4 terminal nodes(size 4). However, as we can observe, the deviance is not strictly decreasing with the tree size. To prevent overfitting, it is prudent to choose the point where the deviance stops decreasing or starts to increase. A good choice could be to select a tree of 4 or 5 for pruning.
+
+```{r}
+set.seed(1)
+prune_tree <- prune.tree(tree.data, best = 4)
+summary(prune_tree)
+```
+Generally, a lower residual mean deviance indicates a better model fit to the data. In the results provided, the residual mean deviance of the unpruned tree is 0.4119, which is lower than the residual mean deviance of the pruned tree(0.5625). So,the unpruned tree has a lower residual mean deviance and is more complex with more terminal nodes. Therefore,based on these factors, it would be considered better.
+
+```{r}
+#| echo: false
+#important to compare the model???????????????
+#tree.pred <- predict(tree.data, data.test)
+#table(tree.pred, lpsa.test) # confusion matrix
+#mean(tree.pred == lpsa.test) # accuracy on test
+#mean(tree.pred != lpsa.test) # prediction error on test
+# ...
+```
+Now, using the 'randomForest' package, the dataset is fitted to a random forest model. By adjusting the 'mtry' parameter, it is possible to change the number of predictors considered at each split. To find the best fit, the model is evaluated using different values of 'mtry'.
+
+```{r}
+library(randomForest)
+set.seed(1)
+n_pred <- ncol(df0) - 1   
+bag.prostate <- randomForest(lpsa~., df0, mtry=n_pred, importance=TRUE) 
+bag.prostate
+
+```
+
+```{r}
+#random forest 
+library(randomForest)
+set.seed(1)
+bag.prostate <- randomForest(lpsa~., df0, mtry=5, importance=TRUE)  
+bag.prostate
+```
+Based on these results, the second random forest model with 'mtry = 5' appears to be the preferred option.
+
+```{r}
+#| echo: false
+#to choose the  mtry values, should I use corss-validation?
+
+#library(randomForest)
+
+# Define range of mtry values to consider
+#mtry_values <- seq(1, ncol(train.data) - 1)  # Consider all possible values of mtry
+
+# Perform cross-validation to select optimal mtry
+#cv_errors <- numeric(length(mtry_values))
+#for (i in seq_along(mtry_values)) {
+#  set.seed(1)  # Set seed for reproducibility
+#  cv_errors[i] <- randomForest(lpsa ~ ., data = data.train, mtry = mtry_values[i])$mse
+#}
+
+# Find optimal mtry with minimum cross-validated error
+#optimal_mtry <- mtry_values[which.min(cv_errors)]
+
+# Fit random forest model with optimal mtry using the training data
+#rf_model <- randomForest(lpsa ~ ., data = data.train, mtry = optimal_mtry)
+
+# Print summary of the optimal random forest model
+#print(rf_model)
+# ...
+```
+
+```{r}
+#| echo: false
+# Make predictions on the training data à
+#predictions <- predict(bag.prostate, newdata = df)
+
+# Calculate Mean Squared Error
+#mse <- mean((df$lpsa - predictions)^2)
+
+# Print MSE
+#print(mse)
+# ...
+```
+We can check out how important each predictor is by using the `importance()` function. The table shows the importance of each variable in the random forest model, as measured by two metrics: '%IncMSE' and 'IncNodePurity'.
+
+```{r}
+knitr::kable(importance(bag.prostate))
+
+```
+To neatly plot these importance measures we use the `varImpPlot()` function:
+
+```{r}
+#arImpPlot(bag.prostate)
+```
+The table demonstartes that 'lcavol' and 'lweight' exhibit higher values in both the metrics, suggesting that they are more influential predictors in the model.
+To fit boosted regression to the prostate dataset will use the 'gbm' package and its 'gbm( )' function. The regression task requires that we use the option distribution ='gaussian'.
+
+```{r}
+library(gbm)
+set.seed(1)
+boosted <- gbm(lpsa ~ ., data=df0, distribution = "gaussian", n.tree=5000, interaction.depth=3) 
+
+knitr::kable(summary(boosted))
+```
+It is possible observed that the top two variables are 'lcavol' and 'lweight' whose have the higher rel.inf values.
+We can evaluate the marginal effect of these two variables by producing a partial dependence plot.
+
+```{r}
+par(mfrow=c(1,2))
+plot(boosted, i ="lcavol")
+plot(boosted, i = "lweight")
+
+```
+The two plots illustrate that the lpsa value generally tends to increase as both the 'lcavol' and 'lweight' parameters increase, but not consistently. Instead, there are numerous oscillations.
+
+At this point, we perform cross-validation tests of all three models, seeing. 
+The results of the cross-validation or the regression tree are not reported again.
+For performing the cross-validation, it is used the library 'caret'.
+```{r}
+library(caret)
+library(randomForest)
+
+train_data <-df0
+
+rf_model <- train(lpsa ~ ., data = train_data, method = "rf", trControl = trainControl(method = "cv", number = 10), tuneLength = 5)
+print(rf_model)
+
+```
+Same code for the boosted model with the only variation being the method set to 'gbm'.
+```{r}
+#| echo: false
+
+library(gbm)
+# Train a boosting model using GBM
+boost_model <- train(lpsa ~ ., data = train_data, method = "gbm", trControl = trainControl(method = "cv", number = 10), verbose = FALSE)
+
+# Print cross-validation results for boosting model
+print(boost_model)
+# ...
+```
+For the Random Forest model, the optimal RMSE was achieved with 'mtry=5' yielding an RMSE value of approximately 0.744. For the Boosting model, the optimal RMSE was achieved with 'n.tree=50' and 'interaction.depth=1', resulting in an RMSE value of approximately 0.779. So, comparing the results, it appears that the Random Forest model performed better that the Boosting model. Considering the Decision Tree model, we can see that the mean of squared residual is 0.4119, indicating a low RMSE compared to the other models. In summary, comparing all the results, it seems that the Decision Tree model performed better that both the Random Forest and Boosting models.
