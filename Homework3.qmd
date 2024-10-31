@@ -1,0 +1,343 @@
+---
+title: Homework.3
+date: 05/13/2024
+author: Eleonora Giuliani 247161
+format:
+  pdf:
+   latex_engine: xelatex
+knitr:
+    opts_chunk:
+        warning: false
+        message: false
+        tidy: true
+        tidy.opts:
+            width.cutoff: 60
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE,
+message=FALSE,
+tidy.opts=list(width.cutoff = 80),
+tidy = TRUE)
+```
+
+This study analyzes a gene expression dataset consisting of 79 patients diagnosed with leukimia. The dataset comprises expression data for 2,000 genes, alongside patient labels indicating two distinct leukemia subgroups: patients with a chromosomal translocation (labelled as "1") and patients with cytogenetically normal leukemia (labelled as "-1"). The objective of this analysis is to develop a predictive model using support vector machines (SVMs) to classify patients into their respective leukemia subgroups based on their gene expression profiles.
+
+Before properly starting the analysis, we shall briefly examine the present dataset, beginning verifying the correctness of the opening.
+
+```{r}
+#| echo: false
+
+dataf <- read.table("C:/Users/eleon/Desktop/QCB/Secondo semestre/Regression/gene_expr.tsv", header=TRUE)
+
+dim(dataf)
+# ...
+```
+
+It is also important to verify the presence of NA values. In this case they are not present. Lastly, we check that the last column contains information about the translocation status of each patient.
+
+```{r}
+#| echo: false
+last_column_name <- colnames(dataf)[ncol(dataf)]
+print(last_column_name)
+unique(dataf$y)
+# ...
+```
+
+We proceeded, with splitting the dataset using the 'sample' function, allocating 70% to the training set and 30% to the testing set.To ensure reproducibility, we set the seed to a specific value, in particular 1.
+
+```{r}
+set.seed(1)
+train_proportion <- 0.7  # 70% for training, 30% for testing
+# Calculate the number of samples for training
+n_train <- round(train_proportion * nrow(dataf))
+# Generate random indices for selecting samples for training
+train_indices <- sample(1:nrow(dataf), n_train, replace = FALSE)
+
+xtrain <- dataf[train_indices, ]
+xtest <- dataf[-train_indices, ]
+ytrain <- dataf$y[train_indices]
+ytest <- dataf$y[-train_indices]
+```
+
+Now, we create a dataframe containing only the training data. It is also necessary to convert ytrain into a factor.
+
+```{r}
+dat <- data.frame(x=xtrain, y=as.factor(ytrain)) 
+```
+
+At this point, it is possible to evaluate different models using Support Vector Machine. To utilize SVM, it is necessary to load the 'e1071' library.
+
+```{r}
+library("e1071")
+```
+
+We begin by setting the kernel as linear. To identify the optimal model, we conduct cross-validation using the 'tune()' function. The 'svm' function is specified as the model to be tuned. 'y' is the response variable and all the other columns in the dataframe are utilized as predictors.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.001, 0.01, 0.1, 1, 5, 10, 100)
+tune.out <- tune(svm, y ~ ., data=dat, kernel="linear",
+                 ranges=list(cost=cost_range))
+```
+
+The cross-validation process allows us to identify the optimal value for the cost parameter. In this case the optimal cost is 0.01 with an error of 0.1633333
+
+```{r}
+bestmod <- tune.out$best.model
+summary(bestmod)
+```
+
+Once we have determined the best-tuned SVM model with the optimal cost parameter, we can proceed to evaluate its performance computing the confusion matrix and the accuracy of the model.
+
+```{r}
+pred.te <- predict(bestmod, newdata=dat)
+table(pred.te, dat$y)
+mean(pred.te == dat$y)
+```
+
+The accuracy of the model is 100%, indicating that all predictions made by the model on the training dataset were correct. However, it is important to evaluate the model's performance on the test dataset.
+
+Indeed, we apply the model on the dataframe containing the test and, again, it performs perfectly.
+
+```{r}
+dat.te <- data.frame(x=xtest, y=as.factor(ytest))
+svm_linear <- svm(y ~ ., data=dat.te, kernel="linear", cost=0.01)
+
+pred.te <- predict(svm_linear, newdata=dat.te)
+table(pred.te, dat.te$y)
+mean(pred.te == dat.te$y)
+```
+
+The next step is to evaluate the SVM model with the radial kernel on the training dataset. In this evaluation, cross-validation will help identify the optimal values not only for the cost parameter but also for the gamma parameter.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.1, 1, 10, 100, 1000)
+gamma_range <- c(0.5, 1, 2, 3, 4)
+tune.out <- tune(svm, y ~ ., data=dat, kernel="radial",
+                 ranges=list(cost=cost_range, 
+                             gamma=gamma_range))
+```
+
+The optimal parameters are cost = 0.1 and gamma = 0.5 with an error of 0.4.
+
+The following code computes predictions using the best-tuned SVM model on the train data. Then, we evaluate the performance of the model.
+
+```{r}
+ypred <- predict(tune.out$best.model, newdata=dat)
+table(true=dat$y, pred=ypred)
+mean(dat$y == ypred)
+```
+
+In this case, the model exhibits low accuracy and it misclassifies approximately 40% of the samples. To conduct further investigation, we evaluate the model's performance on the test data as well.
+
+```{r}
+svm_radial <- svm(y ~ ., data=dat.te, kernel="radial", cost=0.1, gamma =0.5)
+```
+
+In both scenarios, the models achieve an accuracy of around 60%, indicating that approximately 60% of the predictions made by the models are correct. However, the first model fails to recognize any negative instances(class -1), while the second model fails to recognize any positive instances (class 1).
+
+```{r}
+ypred <- predict(svm_radial, newdata=dat.te)
+table(true=dat.te$y, pred=ypred)
+mean(dat.te$y == ypred)
+```
+
+Lastly, we decide to analyze the SVM model with the kernel set to 'polynomial'. In this scenario, cross-validation is utilized to identify the optimal values for both the cost and degree parameters.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.1, 1, 10, 100, 1000)
+degree_range <- c(1,2,3,4,5)
+
+tune.out.pol <- tune(svm, y ~ ., data = dat, kernel = "polynomial",
+                     ranges=list(cost=cost_range, 
+                                 degree=degree_range))
+```
+
+The optimal parameters are cost = 10 and degree = 1 with an error of 0.1633333.
+
+Computing the accuracy and the confusion matrix, it appears that the model perform perfectly, achieving an accuracy of 1.
+
+```{r}
+ypred <- predict(tune.out.pol$best.model, newdata=dat)
+table(true=dat$y, pred=ypred)
+mean(dat$y == ypred)
+```
+
+This trend is confirmed when evaluating the model on the test data.
+
+```{r}
+svm_polynomial <- svm(y ~ ., data=dat.te, kernel="polynomial", 
+                      cost=10, degree = 1)
+
+ypred <- predict(svm_polynomial, newdata=dat.te)
+table(dat.te$y, ypred)
+mean(dat.te$y == ypred)
+```
+
+```{r}
+#| echo: false
+#library(ROCR)
+
+#rocplot <- function(pred, truth, ...) {
+#    predob <- prediction(pred, truth)
+#    perf <- performance(predob, "tpr", "fpr")
+#    plot(perf, ...)
+#}
+
+# Predictions for SVM Model with Linear Kernel
+#pred_linear <- predict(svm_linear, dat.te, decision.values = TRUE)
+#fitted_linear <- attributes(pred_linear)$decision.values
+
+# Predictions for SVM Model with Radial Kernel
+#pred_radial <- predict(svm_radial, dat.te, decision.values = TRUE)
+#fitted_radial <- attributes(pred_radial)$decision.values
+
+# Predictions for SVM Model with Polynomial Kernel
+#pred_polynomial <- predict(svm_polynomial, dat.te, decision.values = TRUE)
+#fitted_polynomial <- attributes(pred_polynomial)$decision.values
+
+# Plot ROC Curves
+#rocplot(fitted_linear, dat.te$y, main = "ROC Curve Comparison", col = "blue")
+#rocplot(fitted_radial, dat.te$y, add = TRUE, col = "red")
+#rocplot(fitted_polynomial, dat.te$y, add = TRUE, col = "green")
+
+# Add Legend
+#legend("bottomright", legend = c("Linear SVM", "Radial SVM", "Polynomial SVM"), col = c("blue", "red", "green"), lty = 1)
+# ...
+```
+
+A popular approach in gene expression analysis is to keep only the most variable genes for downstream analysis. Since most of the 2K genes have low expression or do not vary much across the experiments, this step usually minimizes the contribution of noise. Indeed, we select then only genes whose standard deviation is among the top 5% and we repeat the analyses performed previously on the filtered data set.
+
+```{r}
+#| echo: false
+# Calculate standard deviation for each gene
+gene_sd <- apply(dataf[, -ncol(dataf)], 2, sd)
+# Determine the threshold for the top 5% of standard deviations
+threshold <- quantile(gene_sd, probs = 0.95)
+# Filter genes based on the threshold
+most_variable_genes <- names(gene_sd[gene_sd >= threshold])
+# Subset the dataset to keep only the most variable genes
+fil_df <- dataf[, c(most_variable_genes, "y")]
+# ...
+```
+
+We obtain a dataset with the following dimension:
+
+```{r}
+#| echo: false
+dim(fil_df)
+# ...
+```
+
+As before, it is necessary to transform y in a factor.
+
+```{r}
+fil_df$y <- as.factor(fil_df$y)
+```
+
+We proceed applying the SVM, initially with the linear kernel.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.001, 0.01, 0.1, 1, 5, 10, 100)
+tune.out_linear <- tune(svm, y ~ ., data=fil_df, kernel="linear", 
+                        ranges=list(cost=cost_range))
+```
+
+As for the entire dataset, the optimal cost parameter is 0.01. However, this time, the model does not perform perfectly. There are approximately 10% of incorrect predictions.
+
+```{r}
+#performance
+pred <- predict(tune.out_linear$best.model, newdata=fil_df)
+table(pred, fil_df$y)
+mean(pred == fil_df$y)
+```
+
+Then, we apply the SVM model with the radial kernel.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.1, 1, 10, 100, 1000)
+gamma_range <- c(0.5, 1, 2, 3, 4)
+tune.out_radial <- tune(svm, y ~ ., data=fil_df, kernel="radial",
+                 ranges=list(cost=cost_range, 
+                             gamma=gamma_range))
+```
+
+Again, the optimal parameters are cost=0.1 and gamma=0.5. However, the model accuracy is lower when using the filtered dataset.
+
+```{r}
+#performance
+ypred <- predict(tune.out_radial$best.model, newdata=fil_df)
+table(true=fil_df$y, pred=ypred)
+mean(fil_df$y == ypred)
+```
+
+Lastly, we evaluate the polynomial kernel.
+
+```{r}
+set.seed(1)
+cost_range <- c(0.1, 1, 10, 100, 1000)
+degree_range <- c(1,2,3,4,5)
+
+tune.out.pol <- tune(svm, y ~ ., data = fil_df, kernel = "polynomial",
+                     ranges=list(cost=cost_range, 
+                                 degree=degree_range))
+```
+
+In this case, the optimal parameters are different from those for the full dataset (cost = 10 and degree = 3), but the model still performs perfectly.
+
+```{r}
+#performance
+ypred <- predict(tune.out.pol$best.model, newdata=fil_df)
+table(true=fil_df$y, pred=ypred)
+mean(fil_df$y == ypred)
+```
+
+```{r}
+#| echo: false
+#library(ROCR)
+
+#rocplot <- function(pred, truth, ...) {
+#    predob <- prediction(pred, truth)
+#    perf <- performance(predob, "tpr", "fpr")
+#    plot(perf, ...)
+#}
+
+#svm_linear <- svm(y ~ ., data=fil_df, kernel="linear", cost=0.01)
+#svm_radial <- svm(y ~ ., data=fil_df, kernel="radial", cost = 0.1, 
+#                  gamma=0.5)
+#svm_polynomial <- svm(y ~ ., data=fil_df, kernel="polynomial", cost = 10,
+#                      degree=3)
+
+# Predictions for SVM Model with Linear Kernel
+#pred_linear <- predict(svm_linear, fil_df, decision.values = TRUE)
+#fitted_linear <- attributes(pred_linear)$decision.values
+
+# Predictions for SVM Model with Radial Kernel
+#pred_radial <- predict(svm_radial, fil_df, decision.values = TRUE)
+#fitted_radial <- attributes(pred_radial)$decision.values
+
+# Predictions for SVM Model with Polynomial Kernel
+#pred_polynomial <- predict(svm_polynomial, fil_df, decision.values = TRUE)
+#fitted_polynomial <- attributes(pred_polynomial)$decision.values
+
+# Plot ROC Curves
+#rocplot(fitted_linear, fil_df$y, main = "ROC Curve Comparison", col = "blue")
+#rocplot(fitted_radial, fil_df$y, add = TRUE, col = "red")
+#rocplot(fitted_polynomial, fil_df$y, add = TRUE, col = "green")
+
+# Add Legend
+#legend("bottomright", legend = c("Linear SVM", "Radial SVM", "Polynomial SVM"),
+#       col = c("blue", "red", "green"), lty = 1)
+# ...
+```
+
+\`\`\`
+
+Conclusion
+
+Overall, while the polynomial SVM model consistently performed well and achieved perfect accuracy in both dataset scenarios, the linear SVM model showed a slight decrease in accuracy when applied to the filtered dataset, indicating some sensitivity to feature selection. However, the radial SVM model exhibited lower accuracy despite having optimal parameters. Indeed, the radial SVM model struggled to classify the samples correctly, suggesting potential limitations in capturing the underlying patterns in the data.
