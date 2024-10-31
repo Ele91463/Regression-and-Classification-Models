@@ -1,0 +1,309 @@
+---
+title: Homework.1
+date: 03.29.2024
+author: Eleonora Giuliani 247161
+format:
+  pdf:
+   latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE,
+message=FALSE,
+tidy.opts=list(width.cutoff = 80),
+tidy = TRUE)
+```
+
+## **Breastfeeding intentions among pregnant mothers**
+
+The scientific community recognizes the advantages of breastfeeding, as it provides numerous heath benefits for newborns. Nevertheless, there is a significant variability in breastfeeding choices across populations. Nowdays, mothers can consider various alternative feeding practices, including bottle feeding. Understanding the reasons behind these decisions and the factors that influence them is crucial for developing targeted interventions to promote breastfeeding.
+
+To illuminate the determinants influencing breastfeeding decisions, a scientific study was conducted in a UK hospital. A cohort of 135 expectant mothers was surveyed regarding their preferences for their forthcoming baby. Additional information about the mothers was examined: advancement of the pregnancy (pregnancy), how the mothers were fed as babies (howfed), how the mother’s friend fed their babies (howfedfr), if they have a partner (partner), their age (age), the age at which they left full-time education (educat), their ethnic group (ethnic) and if they have ever smoked (smokebf) or if they have stopped smoking (smokenow).
+
+These factors are analyzed in this study to discern the specific determinants impacting maternal decisions.
+
+**Description of the dataset**
+
+As previously mentioned, the variables included in the dataset are 10, specifically: breast, pregnancy, howfed, howfedfr, age, educat, smokebfand, smokenow. Before properly starting the analysis, we shall briefly examine the present dataset, beginning verifying the correctness of the opening. It is evident that the majority of variables are categorical, with the exception of age and education. Specifically, the response variable "breast" exhibits two categories: "bottle" and "breast". The first category includes the cases “breastfeeding”, “try to breastfeed” and “mixed breast- and bottle-feeding”, while the second category corresponds to “exclusive bottle-feeding”.
+
+```{r}
+#| echo: false
+dataf <- read.csv(file = "C:/Users/eleon/Desktop/bf.csv", header = TRUE, sep = ",")
+View(dataf)
+head(dataf)
+
+# ...
+```
+
+```{r}
+#| echo: false
+summary(dataf)
+# ...
+
+```
+
+Upon inspection of the summary output, it's evident that both "age" and "educat" variables show two NA values each, meaning the presence of two missing values. Since the number of observations not available is relatively small (total NA's = 4), it is reasonable to consider removing rows corresponding to these values.
+
+```{r}
+#| echo: false
+
+# Check for missing values
+
+#is.na(dataf) 
+#sum(is.na(dataf)) 
+data<-na.omit(dataf) 
+#sum(is.na(data))
+# ...
+```
+
+To access the discriminative power of predictors, we generated plots using the ggplot2 library. These plots allowed us to compare the variability of the response variable "breast" based on some predictor variables. It is evident that, among all the predictors, three specific variables play a significant role: whether the mother has stopped smoking, whether she currently smokes and the ethnicity.
+
+From the graph below, it is evident that mothers who never smoked are more likely to choose breastfeeding, with a proportion of over 75% compared to mothers who smoked before pregnancy, with a proportion of about 50%.
+
+```{r}
+#| echo: false
+library(ggplot2)
+#ggplot(data, aes(x = partner, fill = breast)) +                               #buono
+ # geom_bar(position = "fill", width = 0.7) + labs(title = "Breastfeeding choice according to partner status", x = "Partner", y = "Proportion", fill = "Breastfeeding choice")
+
+
+
+# Grafico a barre per la distribuzione di 'breast' in base a 'smokebf'
+ggplot(data, aes(x = smokebf, fill = breast)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Breastfeeding decision by smoking behavior before pregnancy",
+       x = "Smoke before pregnancy",
+       y = "Proportion",
+       fill = "Breastfeeding decision") 
+
+# ...
+```
+
+As anticipated, ethnic background has a significant impact. Analyzing the ggplot, it is evident that non-white mothers tend to choose breastfeeding over bottle feeding by more than 90%, whereas white mothers consider breastfeeding only around 50% of the time.
+
+```{r}
+#| echo: false
+
+# Grafico a barre per correlare ethnic e breast
+ggplot(data, aes(x = ethnic, fill = breast)) +
+  geom_bar(position = "fill") +
+  labs(title = "Breastfeeding decision by ethnic group distribution",
+       x = "Ethnic group",
+       y = "Proportion",
+       fill = "Breastfeeding decision")
+
+# ...
+```
+
+The last plot, instead, highlights the role of current smoking status. More than 80% of mothers who declare they haven't stopped smoking opt for breastfeeding, while only about 20% opt for bottle feeding. Differently, among mothers who have stopped smoking, only about 30% prefer breastfeeding, while the majority prefer bottle feeding.
+
+```{r}
+#| echo: false
+
+# Stacked bar plot for smokenow stratified by breast categories   buono
+ggplot(dataf, aes(x = smokenow, fill = breast)) +
+  geom_bar(position = "fill") +
+  labs(title = "Breastfeeding decision by current smoking status",
+       x = "Stop smoking",
+       y = "Proportion",
+       fill = "Breastfeeding status") +
+  theme_minimal()
+# ...
+```
+
+Before dividing data into training and test sets, it's important to transform categorical variables into dummy variables. This process involves converting each categorical variable into a binary variables(0 and 1). In this way, the predictive model can understand and utilize these variables.
+
+```{r}
+#| echo: false
+
+# Converti le variabili categoriche in variabili numeriche utilizzando as.numeric
+# Trasformazione della variabile 'pregnancy' in una variabile dummy con valori 0 e 1
+data$pregnancy <- ifelse(data$pregnancy == "Beginning", 1, 0)
+
+# Trasformazione della variabile 'howfed' in una variabile dummy con valori 0 e 1
+data$howfed <- ifelse(data$howfed == "Breast", 1, 0)
+
+# Trasformazione della variabile 'howfedfr' in una variabile dummy con valori 0 e 1
+data$howfedfr <- ifelse(data$howfedfr == "Breast", 1, 0)
+
+# Trasformazione della variabile 'partner' in una variabile dummy con valori 0 e 1
+data$partner <- ifelse(data$partner == "Partner", 1, 0)
+
+# Trasformazione della variabile 'smokenow' in una variabile dummy con valori 0 e 1
+data$smokenow <- ifelse(data$smokenow == "No", 1, 0)
+
+# Trasformazione della variabile 'smokebf' in una variabile dummy con valori 0 e 1
+data$smokebf <- ifelse(data$smokebf == "No", 1, 0)
+
+# Trasformazione della variabile 'ethnic' in una variabile dummy con valori 0 e 1
+data$ethnic <- ifelse(data$ethnic == "Non-white", 1, 0)
+
+
+# ...
+```
+
+To verify the correctness of the step:
+
+```{r}
+head(data)
+```
+
+We proceeded, with the splitting of the dataset. This step is crucial because it allows us to assess how well the model predicts actual data. In fact, by splitting the dataset into testing and training sets, we can train the model on training subset(70% of he data) and evaluete its performance on the testing subset (30% of the data). To ensure reproducibility, we set the seed to a specific value, in particular 98 .
+
+```{r}
+library(caret)
+# set the seed
+set.seed(98)
+train_size <- 0.7 
+train_index <- caret::createDataPartition(data$breast, p = 0.7, list =
+                                            FALSE)
+#select train and test
+train_data <- data[train_index, ] 
+test_data <- data[-train_index, ]
+
+```
+
+Before fitting the data into any model, it is necessary to transform the response variable "breast" into a binary numerical variable. In this transformation, the value "1" represents the breastfeeding category, while "0" represents the bottle feeding category.
+
+```{r}
+#| echo: false
+# Transform "Breast" to 1 and "Bottle" to 0
+
+# Transform "breast" variable in test_data
+test_data$breast <- ifelse(test_data$breast == "Breast", 1, 0)
+
+# Transform "breast" variable in train_data
+train_data$breast <- ifelse(train_data$breast == "Breast", 1, 0)
+
+# ...
+```
+
+After that, we fit a generalized linear model using the train data. The response variable is represented by "breast" and all the other variables serve as predictors. We utilized the binomial family for the process.
+
+```{r}
+glm.fits <- glm(breast ~ pregnancy + howfed + howfedfr + partner +
+                  age + educat + ethnic + smokenow + smokebf, 
+                data = train_data, 
+                family = binomial)
+
+```
+
+Analyzing the summary, specifically the statistical significance of the coefficients, we can deduce that, while "pregnancy", "howfed", "partner", "age" and "educat" are not statistically significant (as indicated by their large p-values), "howfedfr", "ethnic", "smokenow" and "smokebf" have a significant effect on the likelihood of the "breast" variable. Additionally, "smokenow" and the intercept term ("breast") appear to have the most significant impact on the model's results.
+
+```{r}
+#| echo: false
+summary(glm.fits)
+# ...
+```
+
+We proceed with the evaluation of the glm model by computing the accuracy of the predictions made by the model on test data.
+
+```{r}
+#| echo: false
+glm.probs <- predict(glm.fits, newdata = test_data, type ="response")
+glm.pred <- rep("bottle", nrow(test_data)) 
+glm.pred[glm.probs > 0.5] <- "breast" 
+# ...
+```
+
+The accuracy is approximately 66.67% and in this case it might be considered reasonable. It performs better than random guessing and so it captures some pattern in the data.
+
+```{r}
+#| echo: false
+#accuracy
+table(glm.pred, test_data$breast)
+#accuracy
+(6+20)/(6+9+4+20)
+#mean(glm.pred == test_data$breast)  #è giusto ma il risultato non va affatto bene
+#mean(glm.pred != test_data$breast)
+# ...
+```
+
+To further analyze the model, we utilized the ROC curve (Receiver Operating Characteristic curve) and computed the AUC (Area Under the Curve). The resulting AUC value shows that the model has a good predictive capability, as it exceeds 0.5.
+
+```{r}
+#| echo: false
+# Installa e carica il pacchetto pROC
+library(pROC)
+
+# Crea un oggetto "prediction" con le probabilità predette e le vere etichette di classe
+predob <- ROCR::prediction(glm.probs, test_data$breast)
+
+# Crea un oggetto "performance" utilizzando il tasso di vero positivo (TPR) e il tasso di falso positivo (FPR)
+perf <- ROCR::performance(predob, "tpr", "fpr")
+
+# Disegna la curva ROC
+plot(perf, main = "Curva ROC", col = "blue")
+
+# Aggiungi una linea diagonale di riferimento
+abline(0, 1, col = "gray", lty = 2)
+
+auc <- ROCR::performance(predob, "auc")@y.values[[1]]
+auc  #buona capacità predittiva del modello
+# ...
+```
+
+After separating the predictor variables from the target variable, we proceeded to fit a k-nearest neighbors classification model(KNN), using the class library. We experimented with various values of k, ultimately selecting a value of 9. Following this, We built the model using the train data.
+```{r}
+#| echo: false
+library(class)
+
+train_knn <- train_data[, -which(names(train_data) == "breast")]
+test_knn <- test_data[, -which(names(test_data) == "breast")]
+# ...
+```
+
+
+```{r}
+k <- 9
+knn_model <- knn(train_knn, test_knn, train_data$breast, k=k)
+```
+
+The accuracy of the KNN model, computed using the confusion matrix, reveals that approximately 79.49% of the predictions were correct out of the total.
+
+```{r}
+#| echo: false
+# Check predictions
+table(knn_model, test_data$breast)
+
+knn_accuracy <- mean(knn_model == test_data$breast)
+knn_accuracy
+
+# ...
+```
+
+As for the previous model, we computed the AUC value of the ROC curve.
+
+```{r}
+#| echo: false
+# Installa e carica il pacchetto pROC
+library(pROC)
+library(ROCR)
+
+# Calcola le probabilità predette per il modello k-NN
+knn_probs <- ifelse(knn_model == "1", 1, 0)  # Converti le previsioni in probabilità (0 o 1)
+pred_knn <- prediction(knn_probs, test_data$breast)
+
+# Calcola le prestazioni utilizzando la funzione performance()
+perf_knn <- performance(pred_knn, "tpr", "fpr")
+
+# Disegna la curva ROC
+#plot(perf_knn, main = "Curva ROC - k-NN Model", col = "blue")
+
+# Aggiungi una linea diagonale di riferimento
+#abline(0, 1, col = "gray", lty = 2)
+
+# Calcola l'AUC
+auc_knn <- performance(pred_knn, "auc")
+auc_knn <- as.numeric(auc_knn@y.values[[1]])
+
+# Stampa l'AUC
+print(auc_knn)
+# ...
+```
+
+**Conclusion**
+
+Analyzing the results obtained from the two predictive models and observing the ggplots, we can draw several conclusions. From the ggplots, confirmed then by the glm model, we identified significant variables that impact the choice of breastfeeding over bottle-feeding. Particularly, the ethnicity of the mother and her smoking habits impact the decision. Subsequently, a comparison between the performance of the two predictive models, GLM and k-NN, was conducted. In order to evaluate the best model, we used accuracy and AUC values. Considering accuracy, the k-NN model performs better, achieving a higher score (79.49% compared to 66.67%). However, based on the AUC value, the GLM model seems to perform better exhibiting n higher score(76.90% compared to 66.55%). Deciding between the two models depends on the trade-off between discriminative power and accuracy.
+
+These findings aid in understanding the determinants that influence the decision process regarding breastfeeding.
